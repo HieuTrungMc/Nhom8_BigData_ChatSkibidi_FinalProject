@@ -1,0 +1,2 @@
+# Overview
+This project is a simple chatbot called `ChatSkibidi` that will compete against `ChatGPT`. It is designed to be a fun and interactive way to engage with users. The chatbot is built using Python and utilizes the `tkinter` library for the GUI interface. The chatbot is capable of responding to user input and can be customized with different themes and styles.
