@@ -1,0 +1,3 @@
+pip install -r require.txt
+python crawl_tvpl.py
+python crawl_txt_tvpl_done.py
