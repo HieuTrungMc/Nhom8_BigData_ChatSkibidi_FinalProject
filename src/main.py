@@ -10,6 +10,7 @@ from llama_index.core.tools import QueryEngineTool
 from llama_index.core.query_engine.router_query_engine import RouterQueryEngine
 from llama_index.core.selectors import LLMSingleSelector
 from llama_index.core.schema import TextNode
+from llama_index.readers.file import PDFReader, UnstructuredReader
 from mongodb import get_mongo_collection, save_to_mongodb
 from dotenv import load_dotenv
 import os
@@ -81,7 +82,13 @@ def initialize_rag_system():
         summary_index = SummaryIndex.load_from_disk("summary_index.json")
     else:
         print("Building indexes from scratch...")
-        documents = SimpleDirectoryReader(input_dir="../data").load_data()
+        documents = SimpleDirectoryReader(
+            input_dir="../data",
+            file_extractor={
+                ".pdf": PDFReader(),
+                ".txt": UnstructuredReader(),
+            }
+        ).load_data()
         splitter = SentenceSplitter(chunk_size=2048)
         nodes = splitter.get_nodes_from_documents(documents)
         save_to_mongodb(collection, nodes)
@@ -199,8 +206,8 @@ def initialize_rag_system():
     return query_engine
 
 # API endpoint for asking questions
-@app.route('/chatskibidi/ask', methods=['GET'])
-def ask_question():
+#@app.route('/chatskibidi/ask', methods=['GET'])
+#def ask_question():
     global query_engine
     
     # Get question from query parameter
@@ -250,8 +257,8 @@ def ask_question():
             "error": str(e)
         }), 500
 
-@app.route('/chatskibidi/ask-vector', methods=['GET'])
-def ask_vector():
+#@app.route('/chatskibidi/ask-vector', methods=['GET'])
+#def ask_vector():
     global vector_query_engine
     question = request.args.get('question', '')
     if not question:
@@ -281,8 +288,8 @@ def ask_vector():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
-@app.route('/chatskibidi/ask-hybrid', methods=['GET'])
-def ask_hybrid():
+#@app.route('/chatskibidi/ask-hybrid', methods=['GET'])
+#def ask_hybrid():
     global hybrid_query_engine
     question = request.args.get('question', '')
     if not question:
@@ -313,8 +320,8 @@ def ask_hybrid():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 # Health check endpoint
-@app.route('/health', methods=['GET'])
-def health_check():
+#@app.route('/health', methods=['GET'])
+#def health_check():
     return jsonify({
         "status": "ok",
         "message": "Server is running",
