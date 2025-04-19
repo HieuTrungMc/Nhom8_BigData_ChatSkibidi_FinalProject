@@ -11,7 +11,7 @@ from llama_index.core.query_engine.router_query_engine import RouterQueryEngine
 from llama_index.core.selectors import LLMSingleSelector
 from llama_index.core.schema import TextNode
 from llama_index.readers.file import PDFReader, UnstructuredReader
-from mongodb import get_mongo_collection, save_to_mongodb
+from mongodb import get_mongo_collection, save_to_mongodb, startMongo
 from dotenv import load_dotenv
 import os
 import re
@@ -72,7 +72,14 @@ def initialize_rag_system():
     global query_engine, vector_query_engine, hybrid_query_engine
 
     load_dotenv()
-    gemini_api_key = os.getenv("GEMINI_API_KEY")
+    gemini_keys = [
+        os.getenv("GEMINI_API_KEY_1"),
+        os.getenv("GEMINI_API_KEY_2"),
+        os.getenv("GEMINI_API_KEY_3"),
+    ]
+    # Remove None values
+    gemini_keys = [k for k in gemini_keys if k]
+
     collection = get_mongo_collection()
 
     # Nếu đã có index, load lại thay vì build mới
@@ -82,23 +89,18 @@ def initialize_rag_system():
         summary_index = SummaryIndex.load_from_disk("summary_index.json")
     else:
         print("Building indexes from scratch...")
-        documents = SimpleDirectoryReader(
-            input_dir="../data",
-            file_extractor={
-                ".pdf": PDFReader(),
-                ".txt": UnstructuredReader(),
-            }
-        ).load_data()
-        splitter = SentenceSplitter(chunk_size=2048)
-        nodes = splitter.get_nodes_from_documents(documents)
+
+        nodes = startMongo()
         save_to_mongodb(collection, nodes)
         mongo_nodes = []
         for doc in collection.find():
-            mongo_nodes.append(TextNode(
-                node_id=doc["node_id"],
-                text=doc["text"],
-                metadata=doc["metadata"]
-            ))
+            print(len(doc["text"]))
+            if(len(doc["text"]) < 10000):
+                mongo_nodes.append(TextNode(
+                    node_id=doc["node_id"],
+                    text=doc["text"],
+                    metadata=doc["metadata"]
+                ))
         nodes = mongo_nodes
 
 
@@ -106,14 +108,30 @@ def initialize_rag_system():
     start_time = time.time()
 
     # Thiết lập mô hình ngôn ngữ và embedding
-    Settings.llm = Gemini(api_key=gemini_api_key, model="models/gemini-2.0-flash-lite")
-    Settings.embed_model = GeminiEmbedding(api_key=gemini_api_key, model="models/text-embedding-004")
+    Settings.llm = Gemini(api_key=gemini_keys[0], model="models/gemini-1.5-flash")
+    Settings.embed_model = GeminiEmbedding(api_key=gemini_keys[0], model="models/gemini-embedding-exp")
+    vector_index = VectorStoreIndex(nodes)
+    print("done vector.")
+
+    Settings.llm = Gemini(api_key=gemini_keys[1], model="models/gemini-1.5-flash")
+    Settings.embed_model = GeminiEmbedding(api_key=gemini_keys[1], model="models/gemini-embedding-exp")
+    summary_index = SummaryIndex(nodes)
+    print("done summary.")
+
+    # Settings.llm = Gemini(api_key=gemini_keys[2], model="models/gemini-2.0-flash")
+    # Settings.embed_model = GeminiEmbedding(api_key=gemini_keys[2], model="models/text-embedding-004")
+    # keyword_index = KeywordTableIndex(nodes)
     print("Đã thiết lập mô hình LLM và embedding.")
 
-    vector_index = VectorStoreIndex(nodes)
-    summary_index = SummaryIndex(nodes)
-    keyword_index = KeywordTableIndex(nodes)
-    bm25_query_engine = keyword_index.as_query_engine()
+    # Tạo vector query engine
+    vector_query_engine = vector_index.as_query_engine(similarity_top_k=5)
+
+    #vietnamese_query_engine = vector_index.as_query_engine()
+
+    #keyword_query_engine = vector_index.as_query_engine()
+    print("Đã tạo các query engine.")
+
+    bm25_query_engine = summary_index.as_query_engine()
     hybrid_query_engine = SimpleHybridQueryEngine(
         vector_query_engine=vector_query_engine,
         bm25_query_engine=bm25_query_engine,
@@ -126,28 +144,22 @@ def initialize_rag_system():
     response_mode="tree_summarize",
     use_async=True,
     )
-    # Tạo vector query engine
-    vector_query_engine = vector_index.as_query_engine(similarity_top_k=5)
-
-    vietnamese_query_engine = vector_index.as_query_engine()
-
-    keyword_query_engine = vector_index.as_query_engine()
-    print("Đã tạo các query engine.")
-
     # Tạo công cụ tóm tắt
     summary_tool = QueryEngineTool.from_defaults(
         query_engine=summary_query_engine,
         description=(
-            "Dùng cho các câu hỏi yêu cầu tóm tắt toàn bộ hoặc một phần tài liệu, "
-            "ví dụ: 'Tóm tắt nội dung chính của tài liệu này', 'Nội dung chương 2 là gì?'."
+            "Dùng cho các câu hỏi yêu cầu tóm tắt toàn bộ hoặc một phần tài liệu. "
+            "Ví dụ: 'Tóm tắt nội dung chính của tài liệu này', 'Tóm tắt chương 2', 'Tóm tắt các điểm quan trọng'. "
+            "Các từ khóa: tóm tắt, tổng hợp, overview, summary, main points."
         ),
     )
     # Tạo công cụ tìm kiếm vector
     vector_tool = QueryEngineTool.from_defaults(
         query_engine=vector_query_engine,
         description=(
-            "Dùng cho các câu hỏi truy xuất thông tin cụ thể, tìm kiếm chi tiết, "
-            "ví dụ: 'Điều 5 quy định gì?', 'Ai là tác giả của tài liệu này?', 'Ngày ban hành là khi nào?'."
+            "Dùng cho các câu hỏi cần truy xuất thông tin chi tiết, tìm kiếm nội dung cụ thể trong tài liệu. "
+            "Ví dụ: 'Điều 5 quy định gì?', 'Ai là tác giả?', 'Ngày ban hành là khi nào?', 'Nội dung của Điều 10'. "
+            "Các từ khóa: tìm kiếm, tra cứu, chi tiết, thông tin, search, find, locate."
         ),
     )
 
@@ -155,8 +167,9 @@ def initialize_rag_system():
     definition_tool = QueryEngineTool.from_defaults(
         query_engine=vector_query_engine,
         description=(
-            "Dùng cho các câu hỏi về định nghĩa, khái niệm, thuật ngữ, "
-            "ví dụ: 'Định nghĩa về dữ liệu cá nhân?', 'Khái niệm an toàn thông tin là gì?'."
+            "Dùng cho các câu hỏi về định nghĩa, giải thích thuật ngữ, khái niệm trong tài liệu. "
+            "Ví dụ: 'Định nghĩa dữ liệu cá nhân là gì?', 'Giải thích khái niệm an toàn thông tin', 'Thuật ngữ này nghĩa là gì?'. "
+            "Các từ khóa: định nghĩa, khái niệm, thuật ngữ, definition, explain, meaning."
         ),
     )
 
@@ -164,7 +177,9 @@ def initialize_rag_system():
     vietnamese_tool = QueryEngineTool.from_defaults(
         query_engine=vector_query_engine,
         description=(
-            "Dùng cho các câu hỏi bằng tiếng Việt hoặc yêu cầu trả lời bằng tiếng Việt."
+            "Dùng cho các câu hỏi bằng tiếng Việt hoặc yêu cầu trả lời bằng tiếng Việt. "
+            "Ví dụ: 'Giải thích bằng tiếng Việt', 'Trả lời bằng tiếng Việt', 'Nội dung này là gì?'. "
+            "Các từ khóa: tiếng Việt, Vietnamese, trả lời bằng tiếng Việt."
         ),
     )
 
@@ -172,8 +187,9 @@ def initialize_rag_system():
     compare_tool = QueryEngineTool.from_defaults(
         query_engine=vector_query_engine,
         description=(
-            "Dùng cho các câu hỏi so sánh giữa các khái niệm, điều khoản, "
-            "ví dụ: 'So sánh điều 5 và điều 6', 'Khác biệt giữa bảo mật và an toàn thông tin?'."
+            "Dùng cho các câu hỏi so sánh giữa các điều khoản, khái niệm, hoặc nội dung khác nhau trong tài liệu. "
+            "Ví dụ: 'So sánh Điều 5 và Điều 6', 'Khác biệt giữa bảo mật và an toàn thông tin', 'Điểm giống và khác nhau giữa hai khái niệm'. "
+            "Các từ khóa: so sánh, khác biệt, giống nhau, comparison, difference, similarity."
         ),
     )
 
@@ -181,8 +197,40 @@ def initialize_rag_system():
     time_tool = QueryEngineTool.from_defaults(
         query_engine=vector_query_engine,
         description=(
-            "Dùng cho các câu hỏi liên quan đến thời gian, mốc thời gian, "
-            "ví dụ: 'Khi nào luật có hiệu lực?', 'Các mốc thời gian quan trọng trong tài liệu?'."
+            "Dùng cho các câu hỏi liên quan đến thời gian, mốc thời gian, hiệu lực, hoặc các sự kiện theo trình tự thời gian. "
+            "Ví dụ: 'Khi nào luật có hiệu lực?', 'Các mốc thời gian quan trọng', 'Thời gian ban hành là khi nào?'. "
+            "Các từ khóa: thời gian, mốc thời gian, hiệu lực, date, timeline, when."
+        ),
+    )
+
+    # Tạo công cụ dành riêng cho tình huống
+    situation_tool = QueryEngineTool.from_defaults(
+        query_engine=vector_query_engine,
+        description=(
+            "Dùng cho các câu hỏi về tình huống thực tế, áp dụng luật vào trường hợp cụ thể, phân tích case study, ví dụ thực tiễn. "
+            "Ví dụ: 'Nếu tôi làm mất giấy tờ thì bị xử lý thế nào?', 'Trong trường hợp này thì Điều 5 có áp dụng không?', "
+            "'Một người dưới 18 tuổi vi phạm thì xử lý ra sao?', 'Tình huống: ... hãy tư vấn pháp lý'. "
+            "Các từ khóa: tình huống, trường hợp, case, scenario, áp dụng, xử lý, ví dụ thực tế, pháp lý thực tiễn."
+        ),
+    )
+
+    # Tạo công cụ dành riêng cho quy trình
+    procedure_tool = QueryEngineTool.from_defaults(
+        query_engine=vector_query_engine,
+        description=(
+            "Dùng cho các câu hỏi về quy trình, thủ tục pháp lý, các bước thực hiện theo luật. "
+            "Ví dụ: 'Thủ tục đăng ký kết hôn như thế nào?', 'Các bước xin cấp lại giấy tờ', 'Quy trình xử lý vi phạm'. "
+            "Các từ khóa: thủ tục, quy trình, procedure, process, các bước, hướng dẫn."
+        ),
+    )
+
+    # Tạo công cụ dành riêng cho mức phạt
+    penalty_tool = QueryEngineTool.from_defaults(
+        query_engine=vector_query_engine,
+        description=(
+            "Dùng cho các câu hỏi về mức phạt, hình thức xử lý, chế tài theo luật. "
+            "Ví dụ: 'Mức phạt cho hành vi này là bao nhiêu?', 'Bị xử lý như thế nào?', 'Chế tài áp dụng ra sao?'. "
+            "Các từ khóa: mức phạt, xử lý, chế tài, penalty, sanction, xử phạt."
         ),
     )
 
@@ -190,43 +238,46 @@ def initialize_rag_system():
 
     # Tạo router query engine
     query_engine = RouterQueryEngine(
-    selector=LLMSingleSelector.from_defaults(),
-    query_engine_tools=[
-    summary_tool,
-    vector_tool,
-    definition_tool,
-    compare_tool,
-    time_tool,
-    vietnamese_tool
-    ],
-    verbose=True)
+        selector=LLMSingleSelector.from_defaults(),
+        query_engine_tools=[
+            summary_tool,
+            vector_tool,
+            definition_tool,
+            compare_tool,
+            time_tool,
+            vietnamese_tool,
+            situation_tool,  # Thêm tool tình huống vào đây
+            procedure_tool,  # Thêm tool quy trình vào đây
+            penalty_tool,  # Thêm tool mức phạt vào đây
+        ],
+        verbose=True)
     
     end_time = time.time()
     print(f"Đã tạo router query engine, initialization time: {end_time - start_time:.2f} seconds")
     return query_engine
 
-# API endpoint for asking questions
-#@app.route('/chatskibidi/ask', methods=['GET'])
-#def ask_question():
+ #API endpoint for asking questions
+@app.route('/chatskibidi/ask', methods=['GET'])
+def ask_question():
     global query_engine
-    
-    # Get question from query parameter
+   
+     #Get question from query parameter
     question = request.args.get('question', '')
-    
+   
     if not question:
         return jsonify({
             "status": "error",
             "message": "No question provided",
             "error": "Missing 'question' parameter"
         }), 400
-    
+   
     try:
-        # Time the query
+         #Time the query
         start_time = time.time()
         response = query_engine.query(question)
         end_time = time.time()
-        
-        # Prepare response data
+       
+         #Prepare response data
         response_data = {
             "status": "success",
             "question": question,
@@ -237,7 +288,7 @@ def initialize_rag_system():
                 "tool_used": response.metadata.get("tool_name", "Unknown") if hasattr(response, "metadata") else "Unknown"
             }
         }
-        
+       
         # Include source nodes if available
         if hasattr(response, "source_nodes"):
             for i, node in enumerate(response.source_nodes):
@@ -247,9 +298,9 @@ def initialize_rag_system():
                     "score": node.score if hasattr(node, "score") else None,
                     "source": node.node.metadata.get("source", "Unknown")
                 })
-        
+       
         return jsonify(response_data)
-        
+       
     except Exception as e:
         return jsonify({
             "status": "error",
@@ -257,8 +308,8 @@ def initialize_rag_system():
             "error": str(e)
         }), 500
 
-#@app.route('/chatskibidi/ask-vector', methods=['GET'])
-#def ask_vector():
+@app.route('/chatskibidi/ask-vector', methods=['GET'])
+def ask_vector():
     global vector_query_engine
     question = request.args.get('question', '')
     if not question:
@@ -288,8 +339,8 @@ def initialize_rag_system():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
-#@app.route('/chatskibidi/ask-hybrid', methods=['GET'])
-#def ask_hybrid():
+@app.route('/chatskibidi/ask-hybrid', methods=['GET'])
+def ask_hybrid():
     global hybrid_query_engine
     question = request.args.get('question', '')
     if not question:
@@ -307,7 +358,7 @@ def initialize_rag_system():
                 "source_nodes": [
                     {
                         "index": i,
-                        "text": node.node.text[:200] + "..." if len(node.node.text) > 200 else node.node.text,
+                        "text": node.node.text + "..." if len(node.node.text) > 200 else node.node.text,
                         "score": node.score if hasattr(node, "score") else None,
                         "source": node.node.metadata.get("source", "Unknown")
                     }
@@ -317,11 +368,11 @@ def initialize_rag_system():
         }
         return jsonify(response_data)
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return jsonify({"status": "error", "message": str(e)}), 500 
 
 # Health check endpoint
-#@app.route('/health', methods=['GET'])
-#def health_check():
+@app.route('/health', methods=['GET'])
+def health_check():
     return jsonify({
         "status": "ok",
         "message": "Server is running",
