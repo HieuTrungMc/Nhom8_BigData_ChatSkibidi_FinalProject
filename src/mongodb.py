@@ -11,65 +11,6 @@ def get_mongo_collection():
     db = client["final"]
     return db["chunks"]
 
-# Chia json thành các chunk
-# def parse_articles_as_chunks(json_data, source="unknown.json"):
-#     documents = []
-
-#     def parse_point(point):
-#         return f"{point.get('letter', '')}. {point.get('content', '')}"
-
-#     def parse_clause(clause):
-#         parts = [f"Khoản {clause.get('number')}: {clause.get('content_full')}"]
-#         for point in clause.get("points", []):
-#             parts.append(f"   {parse_point(point)}")
-#         return "\n".join(parts)
-
-#     def parse_article(article, chapter_title=None):
-#         parts = []
-#         if chapter_title:
-#             parts.append(f"{chapter_title}")
-#         parts.append(f"{article.get('title', '')}")
-#         for clause in article.get("clauses", []):
-#             parts.append(parse_clause(clause))
-#         return "\n\n".join(parts)
-
-#     if isinstance(json_data, list):  # multiple chapters
-#         for chapter in json_data:
-#             chapter_title = chapter.get("title", "")
-#             for article in chapter.get("articles", []):
-#                 text = parse_article(article, chapter_title=chapter_title)
-#                 documents.append(Document(
-#                     text=text,
-#                     metadata={
-#                         "title": article.get("title"),
-#                         "chapter": chapter_title,
-#                         "source": source
-#                     }
-#                 ))
-#     elif isinstance(json_data, dict) and json_data.get("type") == "chapter":
-#         chapter_title = json_data.get("title", "")
-#         for article in json_data.get("articles", []):
-#             text = parse_article(article, chapter_title=chapter_title)
-#             documents.append(Document(
-#                 text=text,
-#                 metadata={
-#                     "title": article.get("title"),
-#                     "chapter": chapter_title,
-#                     "source": source
-#                 }
-#             ))
-#     elif isinstance(json_data, dict) and json_data.get("type") == "article":
-#         text = parse_article(json_data)
-#         documents.append(Document(
-#             text=text,
-#             metadata={
-#                 "title": json_data.get("title"),
-#                 "source": source
-#             }
-#         ))
-
-#     return documents
-
 def parse_articles_as_chunks(json_data, source="unknown.json", max_chunk_size=2048):
     documents = []
 

@@ -1,0 +1,10 @@
+link crawl: https://thuvienphapluat.vn/van-ban/Giao-thong-Van-tai/Nghi-dinh-168-2024-ND-CP-xu-phat-vi-pham-hanh-chinh-an-toan-giao-thong-duong-bo-619502.aspx
+pip install -r require.txt
+python crawl_tvpl.py
+python crawl_txt_tvpl_done.py 
+
+Chi tiết các file crawl:
+crawl_tvpl_full_done.py: crawl dữ liệu của nhiều bộ luật và nghị định khác nhau, sau đó save vào data. 
+crawl_tvpl_json_done.py: crawl nghi dinh 168 thành json để test.
+crawl_tvpl_txt_done.py: crawl thành txt
+
