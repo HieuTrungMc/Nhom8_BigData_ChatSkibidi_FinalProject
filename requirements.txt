@@ -3,3 +3,5 @@ llama-index-llms-gemini
 llama-index-embeddings-gemini
 pypdf
 pymongo
+flask
+flask_cors
