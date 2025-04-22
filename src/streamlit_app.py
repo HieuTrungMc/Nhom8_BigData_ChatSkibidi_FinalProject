@@ -6,6 +6,7 @@ from datetime import datetime
 import os
 from dotenv import load_dotenv
 import uuid
+import base64
 
 # Load environment variables
 load_dotenv()
@@ -53,7 +54,7 @@ def get_context(session_id, max_messages=3):
 # Function to query the Flask API
 def query_api(question, engine, session_id):
     endpoint_map = {
-        "Router": "/chatskibidi/ask",
+        "Default": "/chatskibidi/ask",
         "Vector": "/chatskibidi/ask-vector",
         "Hybrid": "/chatskibidi/ask-hybrid"
     }
@@ -73,23 +74,38 @@ def query_api(question, engine, session_id):
     except requests.RequestException as e:
         return {"status": "error", "message": str(e)}
 
+# Function to set background image
+def set_background(image_file):
+    with open(image_file, "rb") as f:
+        img_data = f.read()
+    b64_encoded = base64.b64encode(img_data).decode()
+    return f"""
+    <style>
+    .stApp {{
+        background-image: url(data:image/png;base64,{b64_encoded});
+        background-size: cover;
+        background-repeat: no-repeat;
+        background-attachment: fixed;
+    }}
+    </style>
+    """
+
 # Custom CSS for dark mode and styling
 st.markdown("""
     <style>
     /* Dark mode styling */
     .stApp {
-        background-color: #1E1E1E;
         color: #E0E0E0;
     }
     .stTextInput > div > div > input {
-        background-color: #2D2D2D;
+        background-color: rgba(45, 45, 45, 0.9);
         color: #E0E0E0;
         border: 1px solid #4A4A4A;
         border-radius: 8px;
         padding: 10px;
     }
     .stButton > button {
-        background-color: #3A3A3A;
+        background-color: rgba(58, 58, 58, 0.9);
         color: #E0E0E0;
         border: 1px solid #4A4A4A;
         border-radius: 8px;
@@ -97,10 +113,10 @@ st.markdown("""
         transition: background-color 0.3s;
     }
     .stButton > button:hover {
-        background-color: #4A4A4A;
+        background-color: rgba(74, 74, 74, 0.9);
     }
     .stSelectbox > div > div {
-        background-color: #2D2D2D;
+        background-color: rgba(45, 45, 45, 0.9);
         color: #E0E0E0;
         border: 1px solid #4A4A4A;
         border-radius: 8px;
@@ -112,24 +128,29 @@ st.markdown("""
         max-width: 80%;
     }
     .user-message {
-        background-color: #3A3A3A;
+        background-color: rgba(58, 58, 58, 0.9);
         margin-left: auto;
         text-align: right;
     }
     .bot-message {
-        background-color: #2D2D2D;
+        background-color: rgba(45, 45, 45, 0.9);
         margin-right: auto;
     }
     .sidebar .sidebar-content {
-        background-color: #252525;
+        background-color: rgba(37, 37, 37, 0.9);
     }
     </style>
 """, unsafe_allow_html=True)
 
 # Streamlit app
 def main():
-    st.title("📚 RAG Chatbot")
-    st.markdown("Interact with the Retrieval-Augmented Generation system to get answers from your documents.")
+    # Set background image if exists
+    bg_image = "background.jpg"  # You can change this to your image path
+    if os.path.exists(bg_image):
+        st.markdown(set_background(bg_image), unsafe_allow_html=True)
+        
+    st.title("📚 ChatSkibidi")
+    st.markdown("Tôi là chatskibidi, hãy hỏi tôi bất cứ điều gì về luật pháp, tôi sẽ giúp bạn tìm đc câu trả lời.")
 
     # Initialize session state
     if "session_id" not in st.session_state:
@@ -142,7 +163,7 @@ def main():
         st.header("Settings")
         engine = st.selectbox(
             "Query Engine",
-            ["Router", "Vector", "Hybrid"],
+            ["Default", "Vector", "Hybrid"],
             help="Choose the query engine to use."
         )
         if st.button("Clear Chat History"):
@@ -170,8 +191,8 @@ def main():
 
     # Input box for new question
     with st.form(key="chat_form", clear_on_submit=True):
-        question = st.text_input("Ask a question:", placeholder="Type your question here...")
-        submit_button = st.form_submit_button("Send")
+        question = st.text_input("Hãy hỏi tôi ở đây:", placeholder="Nhập câu hỏi của bạn...")
+        submit_button = st.form_submit_button("Gửi")
 
         if submit_button and question:
             # Query the API
