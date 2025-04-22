@@ -1,0 +1,84 @@
+Phân tích chi tiết:
+Imports:
+llama_index.core, llama_index.llms.gemini, llama_index.embeddings.gemini: Import các thành phần cốt lõi của LlamaIndex, mô hình ngôn ngữ (LLM) Gemini và mô hình embedding Gemini.
+llama_index.core.tools, llama_index.core.query_engine.router_query_engine, llama_index.core.selectors: Các thành phần để xây dựng hệ thống định tuyến (router) dựa trên các "công cụ" (tools) truy vấn khác nhau.
+llama_index.core.schema, llama_index.readers.file: Các thành phần xử lý cấu trúc dữ liệu (Node, Document) và đọc file (PDF, Unstructured).
+mongodb: Quan trọng: Import các hàm (get_mongo_collection, save_to_mongodb, startMongo) từ file mongodb.py (hoặc file tương tự trong dự án của bạn). Điều này cho thấy file này phụ thuộc vào file kia để lấy dữ liệu ban đầu và kết nối MongoDB.
+dotenv, os, re, time: Các thư viện tiện ích cho biến môi trường, hệ thống, biểu thức chính quy và thời gian.
+flask, flask_cors: Thư viện Flask để tạo web server và CORS để cho phép truy cập từ các tên miền khác (ví dụ: từ frontend chạy trên cổng khác).
+Flask App Initialization:
+app = Flask(__name__): Tạo một đối tượng ứng dụng Flask.
+CORS(app): Cho phép Cross-Origin Resource Sharing, cần thiết nếu frontend và backend chạy trên các cổng/domain khác nhau.
+Global Variables:
+query_engine, vector_query_engine, hybrid_query_engine: Khai báo các biến toàn cục để lưu trữ các query engine của LlamaIndex sau khi được khởi tạo. Việc này cho phép các API endpoint truy cập chúng.
+SimpleHybridQueryEngine Class:
+Nhiệm vụ: Tạo ra một query engine tùy chỉnh kết hợp kết quả từ hai engine khác nhau: một engine tìm kiếm vector (vector_query_engine) và một engine khác (được đặt tên là bm25_query_engine, có thể là keyword-based hoặc từ SummaryIndex).
+Cách hoạt động:
+Nhận câu hỏi, gửi đến cả hai engine con.
+Lấy danh sách các "node" (chunks) được trả về từ mỗi engine.
+Tính điểm kết hợp: Tạo một dictionary node_scores để lưu điểm tổng hợp cho mỗi node duy nhất. Nó dùng trọng số alpha để tính điểm: score = alpha * vector_score + (1 - alpha) * bm25_score. Nếu một node chỉ xuất hiện ở một engine, điểm của engine kia coi như bằng 0 (hoặc dựa trên giá trị mặc định 1.0 nếu không có score).
+Sắp xếp: Sắp xếp các node dựa trên điểm số kết hợp từ cao đến thấp.
+Tạo Response: Tạo một đối tượng HybridResponse tùy chỉnh (không phải chuẩn LlamaIndex) chứa text của top 3 node có điểm cao nhất và danh sách các node đó.
+Mục đích: Kết hợp điểm mạnh của tìm kiếm ngữ nghĩa (vector) và tìm kiếm từ khóa (BM25/keyword) để cải thiện độ liên quan của kết quả.
+initialize_rag_system() Function:
+Nhiệm vụ: Đây là hàm quan trọng nhất, thực hiện toàn bộ việc thiết lập hệ thống RAG khi server khởi động.
+Cách hoạt động:
+Load biến môi trường (API keys...).
+Lấy nhiều Gemini API key (có vẻ để dự phòng hoặc phân tải?).
+collection = get_mongo_collection(): Lấy collection MongoDB từ module mongodb.
+Load/Build Indexes (Logic bị comment): Code có đoạn comment kiểm tra xem các file index (vector_index.json, summary_index.json) đã tồn tại trên đĩa chưa để load lại cho nhanh. Nếu không, nó sẽ build mới. Trong phiên bản hiện tại của bạn, logic này không chạy, nó luôn build mới.
+nodes = startMongo(): Gọi hàm từ module mongodb để load và xử lý (chunking) dữ liệu từ các file nguồn (JSON, TXT, PDF), trả về danh sách Document hoặc Node ban đầu.
+save_to_mongodb(collection, nodes): Gọi hàm từ module mongodb để lưu các node này vào MongoDB (dường như để kiểm tra/tránh xử lý lại).
+Load Nodes từ MongoDB: Đoạn code tiếp theo lại đọc dữ liệu từ chính collection MongoDB đó (collection.find()), tạo lại đối tượng TextNode của LlamaIndex, và lọc bỏ các node có text quá dài (len(doc["text"]) < 10000). Đây mới là danh sách nodes cuối cùng được dùng để xây dựng index.
+Thiết lập Settings LlamaIndex:
+Sử dụng API key Gemini đầu tiên để cấu hình Settings.llm (model gemini-1.5-flash) và Settings.embed_model (model gemini-embedding-exp).
+vector_index = VectorStoreIndex(nodes): Xây dựng index vector từ các nodes đã load từ MongoDB.
+Thay đổi Settings: Lại cấu hình Settings.llm và Settings.embed_model dùng API key Gemini thứ hai (nhưng vẫn cùng model).
+summary_index = SummaryIndex(nodes): Xây dựng index dạng tóm tắt (có thể dùng cho keyword search hoặc summarization).
+Index keyword bị comment.
+Tạo Query Engines:
+vector_query_engine: Tạo engine truy vấn vector chuẩn từ vector_index. similarity_top_k=5 nghĩa là lấy 5 kết quả gần nhất.
+bm25_query_engine: Tạo engine từ summary_index. Dùng làm thành phần thứ hai cho hybrid search.
+hybrid_query_engine: Khởi tạo engine hybrid tùy chỉnh đã định nghĩa ở trên.
+Tạo Tools cho Router:
+summary_query_engine: Tạo một engine khác từ summary_index chuyên cho việc tóm tắt (response_mode="tree_summarize").
+Tạo nhiều QueryEngineTool khác nhau: summary_tool, vector_tool, definition_tool, compare_tool, time_tool, vietnamese_tool, situation_tool, procedure_tool, penalty_tool. Điểm đặc biệt: Hầu hết các tool này (trừ summary_tool) đều sử dụng cùng một vector_query_engine cơ bản. Chúng chỉ khác nhau ở description. Mô tả này rất quan trọng vì nó sẽ giúp RouterQueryEngine (sử dụng LLM) hiểu khi nào nên chọn tool nào dựa trên câu hỏi của người dùng.
+Tạo Router Query Engine:
+query_engine = RouterQueryEngine(...): Tạo engine định tuyến chính.
+selector=LLMSingleSelector.from_defaults(): Sử dụng LLM (Gemini đã cấu hình) để chọn một tool phù hợp nhất từ danh sách query_engine_tools.
+verbose=True: In ra thông tin về tool nào được chọn khi xử lý câu hỏi.
+Kết quả: Trả về query_engine (là router engine) để sử dụng cho API chính.
+API Endpoints (@app.route)
+/chatskibidi/ask (GET):
+Endpoint chính để người dùng hỏi.
+Nhận tham số question từ URL.
+Sử dụng query_engine (router engine) để xử lý câu hỏi.
+Đo thời gian xử lý.
+Trả về JSON chứa câu trả lời (response.response), câu hỏi gốc, và thông tin debug (thời gian, các node nguồn được dùng, tên tool mà router đã chọn).
+Xử lý lỗi nếu có.
+/chatskibidi/ask-vector (GET):
+Endpoint để kiểm tra/sử dụng trực tiếp engine tìm kiếm vector.
+Nhận question, gọi vector_query_engine.query().
+Trả về JSON tương tự, chỉ chứa kết quả từ vector search.
+/chatskibidi/ask-hybrid (GET):
+Endpoint để kiểm tra/sử dụng trực tiếp engine hybrid tùy chỉnh.
+Nhận question, gọi hybrid_query_engine.query().
+Trả về JSON tương tự, chứa kết quả từ hybrid search.
+/health (GET):
+Endpoint đơn giản để kiểm tra xem server có đang chạy không.
+if __name__ == "__main__":
+Khởi tạo: Gọi initialize_rag_system() để thiết lập mọi thứ và gán kết quả (router engine) cho biến toàn cục query_engine.
+Chạy Server: app.run(host='0.0.0.0', port=3000, debug=False): Khởi động Flask server, lắng nghe trên tất cả các địa chỉ IP của máy (0.0.0.0) ở cổng 3000, và tắt chế độ debug.
+
+
+Tóm tắt quy trình của file main:
+Khi server khởi động, hàm initialize_rag_system() được gọi.
+Hàm này gọi các hàm từ module mongodb để load và chunk dữ liệu nguồn thành các Document/Node.
+Nó đọc lại các node đã xử lý từ MongoDB, lọc bỏ những node quá dài.
+Nó cấu hình các mô hình Gemini (LLM và Embedding) với nhiều API key.
+Nó xây dựng hai loại index chính của LlamaIndex: VectorStoreIndex và SummaryIndex từ các node đã chuẩn bị.
+Nó tạo ra các query engine tương ứng: vector, summary (dùng cho BM25 trong hybrid), và một engine hybrid tùy chỉnh.
+Nó định nghĩa một loạt các "công cụ" (tools) chuyên biệt cho các loại câu hỏi khác nhau (tóm tắt, tìm chi tiết, định nghĩa, so sánh, tiếng Việt, tình huống, quy trình, mức phạt), hầu hết đều dựa trên vector_query_engine nhưng có mô tả khác nhau.
+Nó tạo ra một RouterQueryEngine sử dụng LLM để tự động chọn tool phù hợp nhất dựa trên câu hỏi người dùng.
+Sau khi khởi tạo xong, server Flask bắt đầu chạy và lắng nghe các yêu cầu HTTP tại các endpoint đã định nghĩa (/ask, /ask-vector, /ask-hybrid, /health).
+Khi có yêu cầu đến /ask, router engine sẽ phân tích câu hỏi, chọn tool, thực thi tool đó (ví dụ: gọi vector engine), và trả về kết quả dưới dạng JSON.
