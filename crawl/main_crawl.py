@@ -164,12 +164,12 @@ if __name__ == "__main__":
     URLS_TO_CRAWL = [
         "https://thuvienphapluat.vn/van-ban/Giao-thong-Van-tai/Nghi-dinh-168-2024-ND-CP-xu-phat-vi-pham-hanh-chinh-an-toan-giao-thong-duong-bo-619502.aspx", # Nghị định 168 (Giao thông)
         "https://thuvienphapluat.vn/van-ban/Cong-nghe-thong-tin/Nghi-dinh-147-2024-ND-CP-quan-ly-cung-cap-su-dung-dich-vu-Internet-thong-tin-tren-mang-480755.aspx", #Nghị định 147 (Internet)
-        "https://thuvienphapluat.vn/van-ban/So-huu-tri-tue/Luat-So-huu-tri-tue-sua-doi-2022-458435.aspx", # Luật sở hữu trí tuệ
-        "https://thuvienphapluat.vn/van-ban/Cong-nghe-thong-tin/Luat-Giao-dich-dien-tu-2023-20-2023-QH15-513347.aspx", # luật giao dịch điện tử.
-        "https://thuvienphapluat.vn/van-ban/Cong-nghe-thong-tin/Luat-an-ninh-mang-2018-351416.aspx", # Luật an ninh mạng
-        "https://thuvienphapluat.vn/van-ban/Cong-nghe-thong-tin/Luat-cong-nghe-thong-tin-2006-67-2006-QH11-12987.aspx", # Luật công nghệ thông tin
-        "https://thuvienphapluat.vn/van-ban/Trach-nhiem-hinh-su/Luat-Phong-chong-ma-tuy-2021-445185.aspx", # Luật phòng chống ma tuý
-        "https://thuvienphapluat.vn/van-ban/Van-hoa-Xa-hoi/Luat-Phong-chong-bao-luc-gia-dinh-2022-490095.aspx" #Luật phòng chống bạo lực gia đình
+        # "https://thuvienphapluat.vn/van-ban/So-huu-tri-tue/Luat-So-huu-tri-tue-sua-doi-2022-458435.aspx", # Luật sở hữu trí tuệ
+        # "https://thuvienphapluat.vn/van-ban/Cong-nghe-thong-tin/Luat-Giao-dich-dien-tu-2023-20-2023-QH15-513347.aspx", # luật giao dịch điện tử.
+        # "https://thuvienphapluat.vn/van-ban/Cong-nghe-thong-tin/Luat-an-ninh-mang-2018-351416.aspx", # Luật an ninh mạng
+        # "https://thuvienphapluat.vn/van-ban/Cong-nghe-thong-tin/Luat-cong-nghe-thong-tin-2006-67-2006-QH11-12987.aspx", # Luật công nghệ thông tin
+        # "https://thuvienphapluat.vn/van-ban/Trach-nhiem-hinh-su/Luat-Phong-chong-ma-tuy-2021-445185.aspx", # Luật phòng chống ma tuý
+        # "https://thuvienphapluat.vn/van-ban/Van-hoa-Xa-hoi/Luat-Phong-chong-bao-luc-gia-dinh-2022-490095.aspx" #Luật phòng chống bạo lực gia đình
 
         # "https://..."
     ]
