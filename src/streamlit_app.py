@@ -156,13 +156,13 @@ st.markdown("""
 # Streamlit app
 def main():
     # Set background image if exists
-    bg_image = "background1.png"  # You can change this to your image path
+    bg_image = "../images/background1.png"  # You can change this to your image path
     if os.path.exists(bg_image):
         st.markdown(set_background(bg_image), unsafe_allow_html=True)
         #unsafely allow html là để cho phép html vào trong streamlit
         
     st.title("📚 ChatSkibidi")
-    st.markdown("Tôi là chatskibidi, hãy hỏi tôi bất cứ điều gì về luật pháp, tôi sẽ giúp bạn tìm đc câu trả lời.")
+    st.markdown("Tôi là ChatSkibidi, hãy hỏi tôi bất cứ điều gì về luật pháp, tôi sẽ giúp bạn tìm đc câu trả lời.")
 
     # Initialize session state
     if "session_id" not in st.session_state:
