@@ -5,3 +5,6 @@ pypdf
 pymongo
 flask
 flask_cors
+streamlit
+requests
+dotenv
