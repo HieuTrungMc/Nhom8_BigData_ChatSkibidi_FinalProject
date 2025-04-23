@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  crawler:
+    build:
+      context: .
+      dockerfile: docker/crawler.Dockerfile
+    volumes:
+      - ./data:/app/data
+    environment:
+      - PYTHONUNBUFFERED=1
+    networks:
+      - chat_network
+
+  flask_server:
+    build:
+      context: .
+      dockerfile: docker/flask.Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - PYTHONUNBUFFERED=1
+      - FLASK_ENV=production
+    depends_on:
+      - crawler
+    networks:
+      - chat_network
+
+  streamlit_app:
+    build:
+      context: .
+      dockerfile: docker/streamlit.Dockerfile
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - PYTHONUNBUFFERED=1
+      - FLASK_URL=http://flask_server:3000
+    depends_on:
+      - flask_server
+    networks:
+      - chat_network
+
+networks:
+  chat_network:
+    driver: bridge 
