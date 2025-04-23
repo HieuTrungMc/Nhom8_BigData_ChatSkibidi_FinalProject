@@ -5,3 +5,4 @@ pypdf
 pymongo
 flask
 flask_cors
+streamlit
