@@ -1,16 +1,47 @@
-# Overview
-This project is a simple chatbot called `ChatSkibidi` that will compete against `ChatGPT`. It is designed to be a fun and interactive way to engage with users. The chatbot is built using Python and utilizes the `tkinter` library for the GUI interface. The chatbot is capable of responding to user input and can be customized with different themes and styles.
 
-Huong dan:
-1. Build và chạy tất cả services: 
-    docker-compose up --build
-2. Chạy riêng services:
-    docker-compose up crawler
-    docker-compose up flask_server
-    docker-compose up streamlit_app
-3. Xem log services:
-    docker-compose logs -f crawler
-    docker-compose logs -f flask_server
-    docker-compose logs -f streamlit_app
-4. Dừng services:
-    docker-compose down
+# ChatSkibidi Law - Chatbot Luật
+
+**ChatSkibidi** là một chatbot đơn giản được xây dựng bằng Python, sử dụng thư viện `tkinter` để tạo giao diện người dùng (GUI). Dự án này mang tính giải trí, cho phép người dùng tương tác trực tiếp với chatbot trong một không gian vui nhộn và thú vị.
+
+---
+## 🚀 Hướng Dẫn Sử Dụng
+
+### 1. Build và khởi chạy tất cả các services
+```bash
+docker-compose up --build
+```
+
+### 2. Khởi chạy từng service riêng lẻ
+
+- Chạy crawler:
+  ```bash
+  docker-compose up crawler
+  ```
+- Chạy server Flask:
+  ```bash
+  docker-compose up flask_server
+  ```
+- Chạy ứng dụng Streamlit:
+  ```bash
+  docker-compose up streamlit_app
+  ```
+### 3. Xem log của các service
+- Log crawler:
+  ```bash
+  docker-compose logs -f crawler
+  ```
+- Log Flask server:
+  ```bash
+  docker-compose logs -f flask_server
+  ```
+- Log Streamlit app:
+  ```bash
+  docker-compose logs -f streamlit_app
+  ```
+### 4. Dừng tất cả các service
+```bash
+docker-compose down
+```
+---
+💡 *Bạn có thể tùy chỉnh giao diện và chủ đề cho để tạo ra trải nghiệm cá nhân hóa màu sắc hơn.*
+---
