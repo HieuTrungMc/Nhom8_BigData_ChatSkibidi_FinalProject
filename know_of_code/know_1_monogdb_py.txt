@@ -1,0 +1,61 @@
+Phân tích chi tiết từng hàm:
+get_mongo_collection():
+Nhiệm vụ: Thiết lập kết nối đến cơ sở dữ liệu MongoDB và trả về một đối tượng "collection" cụ thể để làm việc.
+Cách hoạt động:
+Lấy URL kết nối MongoDB từ biến môi trường mongo_url. Nếu không có, nó mặc định kết nối tới MongoDB chạy trên máy cục bộ (mongodb://localhost:27017/).
+Tạo một MongoClient để kết nối tới server MongoDB.
+Truy cập vào database có tên là "final".
+Trả về collection có tên là "chunks" từ database đó.
+Mục đích: Cung cấp một cách tập trung để lấy đối tượng collection MongoDB cần thiết cho việc lưu trữ.
+parse_articles_as_chunks(json_data, source="unknown.json", max_chunk_size=2048):
+Nhiệm vụ: Chuyển đổi dữ liệu JSON (đã được cấu trúc theo Chương, Điều, Khoản, Điểm từ bước crawl trước) thành danh sách các đối tượng Document của LlamaIndex. Hàm này thực hiện việc "chunking" (chia nhỏ) dựa trên cấu trúc logic của văn bản luật.
+Cách hoạt động:
+Chunking Strategy: Logic chính ở đây là chia văn bản thành các chunk ở cấp độ "Khoản" (Clause).
+Hàm nội bộ:
+parse_point: Định dạng lại text của một "Điểm" (Point).
+create_document: Tạo một đối tượng Document chuẩn của LlamaIndex, chứa text và metadata (tiêu đề điều, tên file nguồn, chương, số khoản).
+split_text: Quan trọng - Xử lý chunk quá lớn. Nếu nội dung của một "Khoản" (bao gồm cả các "Điểm" bên trong) vượt quá max_chunk_size, hàm này sẽ cố gắng chia nhỏ đoạn text đó thành các phần nhỏ hơn dựa trên dấu chấm câu (.). Điều này đảm bảo không có chunk nào quá dài.
+parse_clause: Xử lý một "Khoản". Nó tạo ra text đầy đủ cho khoản đó (bao gồm tiêu đề khoản và các điểm), sau đó gọi split_text. Nếu split_text trả về nhiều phần, nó sẽ tạo nhiều Document, mỗi Document chứa một phần của khoản đó. Đáng chú ý: Nó thêm "context header" (Tiêu đề Chương - Tiêu đề Điều) vào đầu mỗi chunk được tạo ra từ một khoản, giúp giữ ngữ cảnh khi các khoản bị chia nhỏ.
+process_article: Lặp qua các "Khoản" trong một "Điều" và gọi parse_clause.
+Xử lý đầu vào: Kiểm tra xem json_data là một danh sách (nhiều chương) hay một dictionary (một chương/điều) để xử lý phù hợp.
+Kết quả: Trả về một list các đối tượng Document. Mỗi Document đại diện cho một chunk (thường là một Khoản hoặc một phần của Khoản nếu nó quá dài), kèm theo metadata ngữ cảnh.
+parse_txt_as_chunks(txt_content: str, source="unknown.txt"):
+Nhiệm vụ: Xử lý nội dung từ file .txt thuần túy.
+Cách hoạt động:
+Chunking Strategy: Sử dụng biểu thức chính quy (re.findall) để tìm các đoạn văn bản bắt đầu bằng "Điều số." cho đến khi gặp "Điều số." tiếp theo hoặc kết thúc file. Nghĩa là, nó chia chunk ở cấp độ "Điều" (Article).
+Tạo một đối tượng Document cho mỗi "Điều" tìm thấy. Metadata bao gồm dòng "Điều..." làm tiêu đề và tên file nguồn.
+Kết quả: Trả về list các đối tượng Document, mỗi Document là một "Điều".
+load_documents_from_data_folder(folder_path="../data"):
+Nhiệm vụ: Hàm tổng hợp để đọc tất cả các file được hỗ trợ từ thư mục chỉ định (mặc định là ../data so với vị trí file script này).
+Cách hoạt động:
+Lặp qua tất cả các file trong folder_path.
+Xử lý PDF: Dùng SimpleDirectoryReader của LlamaIndex. Thư viện này sẽ tự động đọc và thực hiện một số cách chia chunk cơ bản cho PDF.
+Xử lý TXT: Mở file, đọc nội dung và gọi parse_txt_as_chunks.
+Xử lý JSON: Mở file, load JSON và gọi parse_articles_as_chunks.
+Nối tất cả các Document tạo ra từ các loại file vào một danh sách docs duy nhất.
+Kết quả: Trả về một list lớn chứa tất cả các Document (chunks) đã được xử lý từ mọi file trong thư mục data.
+clean_text(text):
+Nhiệm vụ: Một hàm tiện ích đơn giản để chuẩn hóa khoảng trắng trong text (loại bỏ các khoảng trắng thừa).
+Lưu ý: Hàm này được định nghĩa nhưng không được gọi trong đoạn code save_to_mongodb bạn cung cấp.
+save_to_mongodb(collection, nodes):
+Nhiệm vụ: Lưu danh sách các đối tượng Node (đây thường là kết quả sau khi LlamaIndex xử lý Document, ví dụ sau khi tạo embedding) vào collection MongoDB đã được chỉ định.
+Cách hoạt động:
+Kiểm tra trùng lặp: Chỉ thực hiện lưu nếu collection MongoDB đang trống (collection.count_documents({}) == 0). Điều này ngăn việc lưu đi lưu lại cùng một dữ liệu.
+Lặp qua danh sách nodes đầu vào.
+Với mỗi node, tạo một dictionary Python doc chứa các trường: node_id (từ node.id_), text (từ node.text_resource.text - *lưu ý cú pháp này có thể hơi cũ hoặc dùng cho loại Node đặc biệt, thường là node.text hoặc node.get_content()), và metadata (từ node.metadata).
+Sử dụng collection.insert_many() để lưu tất cả các dictionary doc vào MongoDB một cách hiệu quả.
+Quan trọng: Hàm này được thiết kế để nhận đầu vào là nodes (thường là kết quả của một pipeline LlamaIndex), chứ không phải Document trực tiếp từ load_documents_from_data_folder.
+startMongo():
+Nhiệm vụ: Một hàm đơn giản gọi load_documents_from_data_folder để thực hiện việc đọc và xử lý dữ liệu từ thư mục data.
+Kết quả: Trả về danh sách các đối tượng Document đã được xử lý.
+
+
+Tóm tắt quy trình:
+Hàm startMongo() sẽ gọi load_documents_from_data_folder().
+load_documents_from_data_folder() duyệt thư mục ../data.
+Với file PDF, dùng SimpleDirectoryReader.
+Với file TXT, đọc text và gọi parse_txt_as_chunks (chunk theo Điều).
+Với file JSON, đọc JSON và gọi parse_articles_as_chunks (chunk theo Khoản, có thể chia nhỏ hơn nếu dài, thêm context header).
+Kết quả là một danh sách lớn các đối tượng Document đã được chunk theo các logic khác nhau tùy loại file.
+Hàm save_to_mongodb() (chưa được gọi trực tiếp trong startMongo) dùng để lưu kết quả xử lý sau này (dạng Node) vào MongoDB, và nó chỉ lưu một lần duy nhất.
+Hàm get_mongo_collection() cung cấp kết nối đến collection MongoDB.
