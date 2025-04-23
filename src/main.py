@@ -94,7 +94,7 @@ def initialize_rag_system():
         save_to_mongodb(collection, nodes)
         mongo_nodes = []
         for doc in collection.find():
-            print(len(doc["text"]))
+            #rint(len(doc["text"]))
             if(len(doc["text"]) < 10000):
                 mongo_nodes.append(TextNode(
                     node_id=doc["node_id"],
@@ -135,7 +135,7 @@ def initialize_rag_system():
     hybrid_query_engine = SimpleHybridQueryEngine(
         vector_query_engine=vector_query_engine,
         bm25_query_engine=bm25_query_engine,
-        alpha=0.5  # trọng số giữa vector và keyword, có thể điều chỉnh
+        alpha=0.8  # trọng số giữa vector và keyword, có thể điều chỉnh
     )
 
     # Lưu lại index để lần sau load nhanh
@@ -144,6 +144,8 @@ def initialize_rag_system():
     response_mode="tree_summarize",
     use_async=True,
     )
+    
+    
     # Tạo công cụ tóm tắt
     summary_tool = QueryEngineTool.from_defaults(
         query_engine=summary_query_engine,
@@ -205,7 +207,7 @@ def initialize_rag_system():
 
     # Tạo công cụ dành riêng cho tình huống
     situation_tool = QueryEngineTool.from_defaults(
-        query_engine=vector_query_engine,
+        query_engine=hybrid_query_engine,
         description=(
             "Dùng cho các câu hỏi về tình huống thực tế, áp dụng luật vào trường hợp cụ thể, phân tích case study, ví dụ thực tiễn. "
             "Ví dụ: 'Nếu tôi làm mất giấy tờ thì bị xử lý thế nào?', 'Trong trường hợp này thì Điều 5 có áp dụng không?', "

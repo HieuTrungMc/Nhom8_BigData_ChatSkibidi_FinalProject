@@ -62,7 +62,7 @@ def query_api(question, engine, session_id):
 
     # Add context to the question
     context = get_context(session_id)
-    full_query = f"{context}\nCurrent Question: {question}" if context else question
+    full_query = f"Câu hỏi: {question} \n\nHãy trả lời bằng tiếng việt nhé." if context else question
 
     try:
         response = requests.get(
