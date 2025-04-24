@@ -1,11 +1,10 @@
-import requests
-from bs4 import BeautifulSoup
-import time
-import re
-import json
-import os
-from urllib.parse import urlparse # <<< Thêm thư viện để phân tích URL
-
+import requests # thư viện dùng để gửi request đến server
+from bs4 import BeautifulSoup # thư viện dùng để phân tích HTML
+import time # thư viện dùng để thêm delay giữa các request
+import re # thư viện dùng để xử lý chuỗi
+import json # thư viện dùng để lưu file JSON
+import os # thư viện dùng để tạo thư mục
+from urllib.parse import urlparse # thư viện dùng để phân tích URL
 # --- Cấu hình Headers ---
 HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36',
@@ -19,50 +18,46 @@ HEADERS = {
 # --- Các hàm xử lý giữ nguyên ---
 def clean_paragraph_text(text):
     """Làm sạch text: loại bỏ khoảng trắng thừa"""
-    text = re.sub(r'\s+', ' ', text)
-    return text.strip()
+    text = re.sub(r'\s+', ' ', text) 
+    return text.strip() 
 
-def parse_legal_document(html_content):
+def parse_legal_document(html_content): # Hàm phân tích HTML và xây dựng cấu trúc JSON
     """Phân tích HTML và xây dựng cấu trúc JSON"""
-    soup = BeautifulSoup(html_content, 'html.parser')
-    # !!! Quan trọng: Giả sử cấu trúc các trang tương tự nhau và đều dùng class 'content1'
-    # Nếu các trang khác có class khác, bạn cần làm hàm này linh hoạt hơn
+    soup = BeautifulSoup(html_content, 'html.parser') 
     content_div = soup.find('div', class_='content1')
 
     if not content_div:
-        print("  Lỗi: Không tìm thấy thẻ div với class 'content1'.")
+        print("  Lỗi: Không tìm thấy thẻ div với class 'content1'.") 
         return None
 
-    document_structure = []
-    current_chapter = None
-    current_article = None
-    current_clause = None
+    document_structure = [] 
+    current_chapter = None 
+    current_article = None 
+    current_clause = None 
 
-    paragraphs = content_div.find_all('p')
-    # ...(Giữ nguyên logic phân tích Chương, Điều, Khoản, Điểm như code trước)...
+    paragraphs = content_div.find_all('p') 
     for p_tag in paragraphs:
-        p_text = clean_paragraph_text(p_tag.get_text())
+        p_text = clean_paragraph_text(p_tag.get_text()) 
         if not p_text: continue
 
-        match_chapter = re.match(r"^(Chương\s+[IVXLCDM]+)(.*)", p_text, re.IGNORECASE)
-        match_article = re.match(r"^(Điều\s+\d+)\.(.*)", p_text)
+        match_chapter = re.match(r"^(Chương\s+[IVXLCDM]+)(.*)", p_text, re.IGNORECASE) 
+        match_article = re.match(r"^(Điều\s+\d+)\.(.*)", p_text) 
         match_clause = re.match(r"^(\d+)\.(.*)", p_text)
-        match_point = re.match(r"^([a-zđ])\)(.*)", p_text)
-
+        match_point = re.match(r"^([a-zđ])\)(.*)", p_text) 
         if match_chapter:
             chapter_title_full = clean_paragraph_text(p_text)
             current_chapter = {"type": "chapter", "title": chapter_title_full, "articles": []}
-            document_structure.append(current_chapter)
-            current_article = None
-            current_clause = None
-            # print(f"Found Chapter: {chapter_title_full}") # Có thể tắt bớt print nếu crawl nhiều
+            document_structure.append(current_chapter) 
+            current_article = None 
+            current_clause = None 
+
         elif match_article:
             article_number = match_article.group(1).strip()
-            article_title_text = match_article.group(2).strip()
+            article_title_text = match_article.group(2).strip() 
             article_title_full = f"{article_number}. {article_title_text}".strip()
-            current_article = {"type": "article", "title": article_title_full, "clauses": [], "content": []}
+            current_article = {"type": "article", "title": article_title_full, "clauses": [], "content": []} 
             if current_chapter:
-                current_chapter["articles"].append(current_article)
+                current_chapter["articles"].append(current_article) 
             else:
                  if not document_structure or document_structure[-1].get("type") != "default_chapter":
                      default_chapter = {"type": "default_chapter", "title": "Nội dung chính", "articles": []}
@@ -70,14 +65,14 @@ def parse_legal_document(html_content):
                      current_chapter = default_chapter
                  current_chapter["articles"].append(current_article)
             current_clause = None
-            # print(f"  Found Article: {article_title_full}")
+         
         elif match_clause:
             clause_number = match_clause.group(1).strip()
             clause_text = match_clause.group(2).strip()
             current_clause = {"type": "clause", "number": clause_number, "content_full": clause_text, "points": [], "sub_content": []}
             if current_article:
                 current_article["clauses"].append(current_clause)
-            else: pass # Bỏ qua warning
+            else: pass
         elif match_point:
             point_letter = match_point.group(1).strip()
             point_text = match_point.group(2).strip()
@@ -87,7 +82,7 @@ def parse_legal_document(html_content):
             elif current_article:
                  if "content" not in current_article: current_article["content"] = []
                  current_article["content"].append(f"{point_letter}) {point_text}")
-            else: pass # Bỏ qua warning
+            else: pass 
         elif not (match_chapter or match_article or match_clause or match_point):
              if current_clause and current_clause["points"]:
                  current_clause["points"][-1]["content"] += "\n" + p_text
@@ -95,21 +90,21 @@ def parse_legal_document(html_content):
                   current_clause["sub_content"].append(p_text)
              elif current_article:
                   current_article["content"].append(p_text)
-             else: pass # Bỏ qua preamble
+             else: pass 
 
     return document_structure
 
-def crawl_and_save_json(url, save_path):
+def crawl_and_save_json(url, save_path): # Hàm crawl và lưu kết quả thành file JSON cho một URL
     """Thực hiện crawl và lưu kết quả thành file JSON cho một URL"""
     print(f"  Bắt đầu xử lý: {url}")
     try:
+        # Gửi request đến URL và lấy nội dung trang
         response = requests.get(url, headers=HEADERS, timeout=30)
-        response.raise_for_status()
+        response.raise_for_status() # Ném ra lỗi nếu trả về lỗi HTTP
 
-        parsed_data = parse_legal_document(response.content)
+        parsed_data = parse_legal_document(response.content) # Phân tích nội dung trang và xây dựng cấu trúc JSON   
 
         if parsed_data:
-            # print(f"    Đang lưu cấu trúc JSON vào: {save_path}") # Tắt bớt log
             try:
                 save_dir = os.path.dirname(save_path)
                 if save_dir: os.makedirs(save_dir, exist_ok=True)
@@ -138,22 +133,16 @@ def crawl_and_save_json(url, save_path):
         return False
 
 # --- Hàm tạo tên file từ URL ---
-def generate_filename_from_url(url):
+def generate_filename_from_url(url): # Hàm tạo tên file hợp lệ từ URL
     """Tạo tên file hợp lệ từ URL"""
     try:
         path = urlparse(url).path
-        # Lấy phần cuối cùng của path (thường chứa ID hoặc slug)
         base = os.path.basename(path)
-        # Loại bỏ phần mở rộng file (ví dụ .aspx, .html)
         filename_part = os.path.splitext(base)[0]
-        # Loại bỏ các ký tự không hợp lệ cho tên file, thay bằng dấu gạch dưới
-        # Chỉ giữ lại chữ cái, số, dấu gạch dưới, dấu gạch ngang
         safe_filename = re.sub(r'[^\w\-]+', '_', filename_part)
-        # Đảm bảo không quá dài (tùy chọn)
-        safe_filename = safe_filename[:100] # Giới hạn 100 ký tự
+        safe_filename = safe_filename[:100] 
         return f"{safe_filename}.json"
     except Exception as e:
-        # Fallback nếu parse URL lỗi: dùng mã hash của URL
         print(f"Warning: Không thể parse URL để tạo tên file ({e}). Sử dụng hash.")
         import hashlib
         return f"doc_{hashlib.md5(url.encode()).hexdigest()[:10]}.json"
